@@ -1,27 +1,61 @@
+function [nodes2edge, edge2element] = edge(element, coordinate)
+% EDGE Construct node-edge and edge-element connectivity.
+%
+% Inputs:
+%   element    : M-by-3 triangular element connectivity
+%   coordinate : N-by-2 node coordinates
+%
+% Outputs:
+%   nodes2edge : Sparse symmetric node-to-edge connectivity matrix
+%   edge2element : E-by-4 matrix containing:
+%       columns 1-2: edge endpoint nodes
+%       columns 3-4: adjacent element information
 
-function [nodes2edge,edge2element]=edge(element,coordinate)
+nNodes = size(coordinate, 1);
+nElements = size(element, 1);
 
-nodes2element=zeros(size(coordinate,1),size(coordinate,1));% sparse
-for j=1:size(element,1)
-    nodes2element(element(j,:),element(j,[2 3 1]))=...
-      nodes2element(element(j,:),element(j,[2 3 1]))+j*eye(3,3);
-end
+% Collect all triangle edges.
+allEdges = [
+    element(:, [1 2]);
+    element(:, [2 3]);
+    element(:, [3 1])
+];
 
-B=nodes2element+nodes2element';
-[i,j]=find(triu(B));
-nodes2edge=sparse(i,j,1:size(i,1),size(coordinate,1),size(coordinate,1));
-nodes2edge=nodes2edge+nodes2edge';
+% Sort endpoints so that each undirected edge has one representation.
+sortedEdges = sort(allEdges, 2);
 
-edge2element=zeros(size(i,1),4);
-for m = 1:size(element,1)
-  for k = 1:3 
-    p = nodes2edge(element(m,k),element(m,rem(k,3)+1)); 
-     if edge2element(p,1)==0  
-      edge2element(p,:)=[element(m,k) element(m,rem(k,3)+1)  nodes2element(element(m,k),element(m,rem(k,3)+1)) ...
-                          nodes2element(element(m,rem(k,3)+1),element(m,k))];                           
+% Identify unique edges.
+[uniqueEdges, ~, edgeIndex] = unique(sortedEdges, 'rows');
+
+nEdges = size(uniqueEdges, 1);
+
+% Construct symmetric node-to-edge connectivity.
+nodes2edge = sparse( ...
+    [uniqueEdges(:,1); uniqueEdges(:,2)], ...
+    [uniqueEdges(:,2); uniqueEdges(:,1)], ...
+    [1:nEdges, 1:nEdges], ...
+    nNodes, nNodes);
+
+% Construct edge-to-element connectivity.
+edge2element = zeros(nEdges, 4);
+
+% Element indices associated with each edge.
+elementIndices = repmat((1:nElements)', 3, 1);
+
+for k = 1:size(allEdges, 1)
+
+    e = edgeIndex(k);
+    elemIndex = elementIndices(k);
+
+    if edge2element(e, 1) == 0
+
+        edge2element(e, 1:2) = allEdges(k, :);
+        edge2element(e, 3) = elemIndex;
+
+    else
+
+        edge2element(e, 4) = elemIndex;
+
     end
-  end
 end
-  
-
-
+end
