@@ -6,29 +6,29 @@ Implemented in MATLAB
 
 ## Problem formulation
 
-The solver considers the Poisson boundary-value problem
+The solver considers the Poisson boundary value problem
 
-\[
--\Delta u=f \quad \text{in } \Omega=(0,1)^2,
-\]
+$$
+-\Delta u = f \quad \text{in } \Omega = (0,1)^2,
+$$
 
-\[
-u=0 \quad \text{on } \partial\Omega.
-\]
+$$
+u = 0 \quad \text{on } \partial\Omega.
+$$
 
 A manufactured exact solution is used to evaluate the numerical error:
 
-\[
-u(x,y)=xy(x-1)(y-1).
-\]
+$$
+u(x,y) = xy(x-1)(y-1).
+$$
 
 The corresponding forcing function is
 
-\[
-f(x,y)=-2x(x-1)-2y(y-1).
-\]
+$$
+f(x,y) = -2x(x-1)-2y(y-1).
+$$
 
-The exact solution satisfies the homogeneous Dirichlet boundary condition.
+The exact solution satisfies the homogeneous Dirichlet boundary condition
 
 ## Numerical method
 
