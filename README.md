@@ -1,80 +1,153 @@
-# FEM Solver for the 2D Poisson Equation (P1 elements, MATLAB/Octave)
+# P1 Finite Element Solver for the 2D Poisson Equation
 
-A from-scratch finite element solver for the Poisson equation on the unit square, with uniform red mesh refinement and an empirical check of the convergence rates against finite element theory.
+A from-scratch implementation of the **linear finite element method (P1 FEM)** for solving the two-dimensional Poisson equation on the unit square. The project includes triangular mesh generation, element stiffness matrix construction, sparse global assembly, uniform red refinement, and numerical error estimation.
 
-## Problem
+Implemented in MATLAB
 
-```
--Δu = f   in Ω = (0,1)²
-  u = 0   on ∂Ω
-```
+## Problem formulation
 
-A manufactured solution is used so the exact error can be computed:
+The solver considers the Poisson boundary-value problem
 
-```
-u(x,y) = sin(πx) sin(πy)
-f(x,y) = 2π² sin(πx) sin(πy)
-```
+\[
+-\Delta u=f \quad \text{in } \Omega=(0,1)^2,
+\]
 
-## Method
+\[
+u=0 \quad \text{on } \partial\Omega.
+\]
 
-- **Weak form:** find u ∈ H₀¹(Ω) with ∫ ∇u·∇v = ∫ f v for all v ∈ H₀¹(Ω).
-- **Discretisation:** continuous piecewise-linear (P1) elements on triangles. Element stiffness matrices are computed in closed form from barycentric gradients (`stima.m`).
-- **Assembly:** loop over elements, add each 3×3 element matrix into the global sparse matrix. The load vector uses a one-point (centroid) quadrature rule.
-- **Boundary conditions:** Dirichlet nodes are removed and the system is solved on the free nodes with MATLAB's sparse backslash.
-- **Mesh:** the initial mesh is the unit square split into 2 triangles (`InitialMesh.m`). Each refinement level splits every triangle into 4 by joining edge midpoints (red refinement: `edge.m` builds the edge connectivity, `redrefine.m` creates the new nodes and elements). Level `i` has 2·4^i triangles and mesh size h = 1/2^i.
+A manufactured exact solution is used to evaluate the numerical error:
 
-## Error measurement (`Err.m`)
+\[
+u(x,y)=xy(x-1)(y-1).
+\]
 
-- **L² error:** a 7-point quadrature rule per triangle (3 vertices, 3 edge midpoints, centroid).
-- **H¹ seminorm error:** the exact gradient is evaluated at the centroid and compared with the constant FE gradient on that triangle.
+The corresponding forcing function is
 
-## Results
+\[
+f(x,y)=-2x(x-1)-2y(y-1).
+\]
 
-Run `convergence_study.m` to reproduce (verified in MATLAB-style code under GNU Octave 8.4):
+The exact solution satisfies the homogeneous Dirichlet boundary condition.
 
-| Level | h    | Triangles | L² error | H¹ error | L² rate | H¹ rate |
-| ----- | ---- | --------- | -------- | -------- | ------- | ------- |
-| 1     | 1/2  | 8         | 3.00e-1  | 1.33     | -       | -       |
-| 2     | 1/4  | 32        | 9.64e-2  | 6.56e-1  | 1.64    | 1.02    |
-| 3     | 1/8  | 128       | 2.58e-2  | 3.26e-1  | 1.90    | 1.01    |
-| 4     | 1/16 | 512       | 6.57e-3  | 1.63e-1  | 1.97    | 1.00    |
-| 5     | 1/32 | 2048      | 1.65e-3  | 8.13e-2  | 1.99    | 1.00    |
-| 6     | 1/64 | 8192      | 4.13e-4  | 4.06e-2  | 2.00    | 1.00    |
+## Numerical method
 
-![Convergence plot](convergence.png)
+The problem is discretised using continuous, piecewise-linear triangular finite elements.
 
-The observed rates approach 2 in L² and 1 in H¹, as theory predicts for P1 elements on quasi-uniform meshes (Céa's lemma plus standard interpolation estimates). Rates are computed as `log(e_i/e_{i+1}) / log(h_i/h_{i+1})`.
+### 1. Initial mesh and refinement
 
-## Usage
+The initial mesh consists of four triangular elements covering the unit square, with an interior node at its centre.
+
+Uniform red refinement divides each triangle into four smaller triangles by introducing edge midpoints.
+
+The refinement procedure is implemented through:
+
+- `InitialMesh.m`: constructs the initial triangulation and boundary edges.
+- `edge.m`: identifies edge-node and edge-element connectivity.
+- `redrefine.m`: creates new nodes, elements, and refined boundary edges.
+
+### 2. Element stiffness matrix
+
+For each triangular element, the local stiffness matrix is computed using the gradients of the linear barycentric basis functions.
+
+The local matrix is assembled into the global sparse stiffness matrix.
+
+Implementation: `stima.m`.
+
+### 3. Global assembly and solution
+
+The global stiffness matrix and load vector are assembled by iterating over the triangular elements.
+
+The load vector uses a one-point quadrature rule evaluated at each element centroid.
+
+The Dirichlet boundary values are imposed using the exact solution. The resulting sparse linear system is solved over the free degrees of freedom using MATLAB's sparse backslash operator.
+
+Main implementations: `fem.m` and `ocfem.m`.
+
+### 4. Error estimation
+
+The numerical solution is compared with the manufactured exact solution.
+
+Two error measures are computed:
+
+- **L² error:** approximated using a seven-point quadrature rule per triangle, involving the vertices, edge midpoints, and centroid.
+- **H¹-seminorm error:** compares the constant gradient of the P1 finite element solution with the exact gradient evaluated at the triangle centroid.
+
+Implementation: `Err.m`.
+
+## Expected convergence behaviour
+
+For sufficiently regular solutions and quasi-uniform triangular meshes, standard P1 finite element theory predicts
+
+\[
+\|u-u_h\|_{L^2(\Omega)}=O(h^2),
+\]
+
+and
+
+\[
+|u-u_h|_{H^1(\Omega)}=O(h).
+\]
+
+The convergence study computes errors across successive uniform refinement levels and estimates the observed rates using
+
+\[
+r=\frac{\log(e_i/e_{i+1})}
+        {\log(h_i/h_{i+1})}.
+\]
+
+Here, \(e_i\) denotes the error at refinement level \(i\), and \(h_i\) is the mesh-size indicator calculated in the convergence driver.
+
+The expected asymptotic rates are approximately 2 in L² and 1 in the H¹ seminorm.
+
+*Numerical convergence values should be added after reproducing the current source code results in MATLAB*
+
+## Repository structure
+
+| File | Description |
+|---|---|
+| `fem.m` | Main FEM driver: mesh refinement, assembly, solution, error computation, and visualisation |
+| `ocfem.m` | Driver for the multi-level convergence study |
+| `convergence_study.m` | Runs the convergence study and generates its summary plot |
+| `InitialMesh.m` | Initial triangular mesh and boundary-edge construction |
+| `edge.m` | Edge-node and edge-element connectivity |
+| `redrefine.m` | Uniform red refinement of triangular elements |
+| `stima.m` | Local element stiffness matrix |
+| `Err.m` | L² and H¹-seminorm error estimation |
+| `f.m` | Forcing function |
+| `ue.m` | Manufactured exact solution |
+| `uxe.m` | Exact gradient of the solution |
+| `u_nodes.m` | Evaluation of the exact solution at mesh nodes |
+| `u_N.m` | Neumann boundary data helper |
+| `show.m` | Visual comparison of the finite element and exact solutions |
+
+## Running the project
+
+Place all MATLAB files in the same directory and run the following commands:
 
 ```matlab
-fem                 % solve on 5 refinement levels, plot FE vs exact solution
-ocfem               % convergence study over 6 levels (prints rates)
-convergence_study   % table + log-log plot (convergence.png)
+% Run the FEM solver and visualise the solution
+fem
+
+% Run the multi-level convergence study
+ocfem
+
+% Generate the convergence summary and plot
+convergence_study
 ```
 
-## Files
+The main solver and convergence driver use different numbers of refinement levels.
 
-| File | Purpose |
-| --- | --- |
-| `fem.m` | Main driver: refine, assemble, solve, compute errors, plot |
-| `ocfem.m` | Convergence-rate study driver |
-| `convergence_study.m` | Runs `ocfem`, prints the table, saves the plot |
-| `InitialMesh.m` | Initial triangulation of the unit square |
-| `edge.m`, `redrefine.m` | Edge connectivity and red refinement |
-| `stima.m` | Element stiffness matrix |
-| `Err.m` | L² and H¹ error computation |
-| `f.m`, `ue.m`, `uxe.m`, `u_nodes.m` | Right-hand side, exact solution, exact gradient |
-| `u_N.m` | Neumann data helper (not used in the Dirichlet-only runs) |
-| `show.m` | Side-by-side plot of FE and exact solutions |
+## Current scope and limitations
 
-## Limitations
+- The implementation uses P1 (piecewise-linear) triangular elements.
+- The computational domain is the unit square.
+- Mesh refinement is uniform rather than adaptive.
+- The load vector uses centroid-based one-point quadrature.
+- The H¹-seminorm error uses a centroid evaluation of the exact gradient.
+- Global sparse matrix assembly is performed inside element loops, which may become computationally expensive on finer meshes.
+- The implementation is intended as a numerical methods and FEM demonstration rather than a general-purpose PDE solver.
 
-- Uniform refinement only, on the unit square, with P1 elements.
-- Load vector uses a one-point quadrature rule, and the H¹ error uses a one-point rule for the exact gradient.
-- Global assembly grows a sparse matrix inside a loop, which is slow for very fine meshes.
+## References
 
-## Reference
-
-S. C. Brenner and L. R. Scott, *The Mathematical Theory of Finite Element Methods*, Springer.
+- S. C. Brenner and L. R. Scott, *The Mathematical Theory of Finite Element Methods*, Springer
